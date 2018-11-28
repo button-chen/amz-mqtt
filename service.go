@@ -89,6 +89,32 @@ func sendMsgBuff(c io.Closer, buf []byte) error {
 	return nil
 }
 
+func getConnectACK(req *Mqtt) ([]byte, error) {
+	// 确认连接请求
+	h := &Header{}
+	h.MessageType = CONNACK
+
+	rep := &Mqtt{}
+	rep.Header = h
+	rep.ReturnCode = ACCEPTED
+	rep.ConnectFlags = &ConnectFlags{}
+	if req.ConnectFlags.CleanSession {
+		rep.ConnectAckFlags = 0
+	} else if !req.ConnectFlags.CleanSession {
+		// TODO 服务端保存了会话状态设置为1， 反之设置为0
+		rep.ConnectAckFlags = 0
+	}
+
+	buf, err := Encode(rep)
+	return buf, err
+}
+
+func getSubACK(req *Mqtt) ([]byte, error) {
+	req.Header.MessageType = SUBACK
+	buf, err := Encode(req)
+	return buf, err
+}
+
 func HandConn(c io.Closer) {
 	defer func() {
 		c.Close()
@@ -102,18 +128,8 @@ func HandConn(c io.Closer) {
 		return
 	}
 	fmt.Printf("connect info: %v", mqtt)
-	// 回复确认连接请求
-	repconn := &Mqtt{}
-	connfg := &ConnectFlags{}
-	h := &Header{}
-	h.MessageType = CONNACK
 
-	connfg.CleanSession = true
-	repconn.ReturnCode = ACCEPTED
-	repconn.ConnectFlags = connfg
-	repconn.Header = h
-
-	repbuf, err := Encode(repconn)
+	repbuf, err := getConnectACK(mqtt)
 	if err != nil {
 		return
 	}
@@ -126,6 +142,13 @@ func HandConn(c io.Closer) {
 		if err != nil {
 			break
 		}
-		fmt.Println("recv: ", n)
+		if n == 0 {
+			continue
+		}
+		// 假设收到了订阅请求
+		mqttnext, _ := Decode(rbuf[0:n])
+		fmt.Println(mqttnext.Topics)
+		repbufnext, _ := getSubACK(mqttnext)
+		sendMsgBuff(c, repbufnext)
 	}
 }

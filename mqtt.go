@@ -7,6 +7,8 @@ import (
 
 type MessageType uint8
 type ReturnCode uint8
+
+// Header mqtt 头部信息
 type Header struct {
 	MessageType     MessageType
 	DupFlag, Retain bool
@@ -27,8 +29,10 @@ type Mqtt struct {
 	Topics                                                                        []string
 	Topics_qos                                                                    []uint8
 	ReturnCode                                                                    ReturnCode
+	ConnectAckFlags                                                               uint8
 }
 
+// 消息类型 文档 2.2.1
 const (
 	CONNECT = MessageType(iota + 1)
 	CONNACK
@@ -252,7 +256,7 @@ func Encode(mqtt *Mqtt) ([]byte, error) {
 		}
 	case CONNACK:
 		{
-			buf.WriteByte(byte(0))
+			buf.WriteByte(byte(mqtt.ConnectAckFlags))
 			setUint8(uint8(mqtt.ReturnCode), &buf)
 		}
 	case PUBLISH:
